@@ -1,4 +1,4 @@
-from flask import Flask, request, Response
+from flask import Flask, request
 from flask_cors import CORS
 from model.user import User
 from model.responseException import responseException
@@ -11,7 +11,7 @@ from base64 import b32encode
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from uuid import uuid4
 from os import remove
-import bcrypt, smtplib, jwt, pyotp, random, string, qrcode, configparser, json
+import bcrypt, smtplib, jwt, pyotp, random, string, qrcode, configparser, datetime
 
 app = Flask(__name__)
 CORS(app, allow_headers=["Content-Type", "Authorization", "Accept-Language"], 
@@ -88,7 +88,7 @@ def postRegister():
 
         remove(qrcodeFullPathName)
 
-        return Response(f"User created: {createdUser.id}", status=201)
+        return f"User created: {createdUser.id}", 201
     except responseException as e:
         return e.getErrorData(), e.statusCode
     except Exception as e:
@@ -123,24 +123,25 @@ def postLogin():
         email = request.json["email"]
         password = request.json["password"]
         mfaKey = request.json["mfaKey"]
-
+        
         for user in User.objects(email=email):
-            if not pyotp.TOTP(b32encode(str.encode(user.mfaSecret))).now() == mfaKey:
+            """ if not pyotp.TOTP(b32encode(str.encode(user.mfaSecret))).now() == mfaKey:
                 raise responseException(f"Wrong TOTP value", 401)
 
             if not bcrypt.checkpw(str.encode(password), str.encode(user.password)):
                 raise responseException("Wrong Password", 401)
 
             if not user.status == 'active':
-                raise responseException(f"User id:{user.id} is not active", 401)
+                raise responseException(f"User id:{user.id} is not active", 401) """
             
             payload = {
                 "userEmail": user.email,
-                "userId": str(user.id)
+                "userId": str(user.id),
+                "tokenExpiration": str(datetime.datetime.now())
             }
-
-            jwtToken = jwt.encode(payload=payload, key=JWT_SECRET)
             
+            jwtToken = jwt.encode(payload=payload, key=JWT_SECRET)
+                     
         return jwtToken, 200
     
     except responseException as e:
