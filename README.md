@@ -111,7 +111,7 @@ The generated JWT uses the secret configured in `config.conf` file, in the [JWT]
 - [x] Feature - Add company's personalization
 - [ ] Feature - Use validator for POST requests
 - [ ] Feature - upload to company's logo
-- [ ] Code Improvement - Better error handling
+- [x] Code Improvement - Better error handling
 - [ ] Feature - Create DockerFile
 - [ ] Feature - Create file with required packages to `pip install -r requirements`
 - [ ] Feature - Delete and Update user (admin/owner)
