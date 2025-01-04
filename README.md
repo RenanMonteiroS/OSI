@@ -97,7 +97,8 @@ Activates previously created user.
 ### /login
 
 **[POST] Method**
-Generates and returns a JWT token, with `userId` and `userEmail` as payload
+Generates and returns a JWT token, with `userId`, `userEmail` and a `tokenExpiration` as payload.
+The token have an expiration time of 30 minutes.
 The generated JWT uses the secret configured in `config.conf` file, in the [JWT] section. 
 
 **Expects:**

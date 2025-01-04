@@ -1,2 +1,3 @@
 config.conf
 templates/static/images
+__pycache__

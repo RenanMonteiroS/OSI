@@ -125,19 +125,21 @@ def postLogin():
         mfaKey = request.json["mfaKey"]
         
         for user in User.objects(email=email):
-            """ if not pyotp.TOTP(b32encode(str.encode(user.mfaSecret))).now() == mfaKey:
+            if not pyotp.TOTP(b32encode(str.encode(user.mfaSecret))).now() == mfaKey:
                 raise responseException(f"Wrong TOTP value", 401)
 
             if not bcrypt.checkpw(str.encode(password), str.encode(user.password)):
                 raise responseException("Wrong Password", 401)
 
             if not user.status == 'active':
-                raise responseException(f"User id:{user.id} is not active", 401) """
+                raise responseException(f"User id:{user.id} is not active", 401)
             
+            tokenExpiration = datetime.timedelta(minutes=30) + datetime.datetime.now() 
+
             payload = {
                 "userEmail": user.email,
                 "userId": str(user.id),
-                "tokenExpiration": str(datetime.datetime.now())
+                "tokenExpiration": str(tokenExpiration)
             }
             
             jwtToken = jwt.encode(payload=payload, key=JWT_SECRET)
