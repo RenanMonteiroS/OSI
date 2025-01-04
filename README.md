@@ -8,7 +8,8 @@ All user information are stored in a MongoDB Atlas database.
 Supports TOTP (Google Authentication) authentication.
 
 ### Built with
-* [![Python][Python]][Python-url]
+* <img src="https://s3.dualstack.us-east-2.amazonaws.com/pythondotorg-assets/media/community/logos/python-logo-only.png" width="5%">
+* <img src="https://flask.palletsprojects.com/en/stable/_images/flask-horizontal.png" width="15%">
 
 ## Installation
 
