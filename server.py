@@ -45,7 +45,7 @@ def postRegister():
     img = qrcode.make(totp.provisioning_uri(name=email, issuer_name=f'{config['COMPANY_INFO']['COMPANY_NAME']} OSI'))
     img.save(qrcodeFullPathName)
     
-    createdUser = User(name=name, email=email, password=hashedPassword, activationToken=token_urlsafe(), mfaSecret=mfaSecret, status='inactive').save()
+    createdUser = User(name=name, email=email, password=hashedPassword, activationToken=token_urlsafe(), mfaSecret=mfaSecret).save()
 
     env = Environment(
         loader=FileSystemLoader('./templates/'),
