@@ -113,6 +113,8 @@ The generated JWT uses the secret configured in `config.conf` file, in the [JWT]
 - [ ] Feature - Use validator for POST requests
 - [ ] Feature - upload to company's logo
 - [x] Code Improvement - Better error handling
+- [x] Code Improvement - `created_at` and `modified_at` column in User class/document 
+- [x] Code Improvement - JWT with expiration time payload attribute
 - [ ] Feature - Create DockerFile
 - [ ] Feature - Create file with required packages to `pip install -r requirements`
 - [ ] Feature - Delete and Update user (admin/owner)

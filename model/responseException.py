@@ -1,4 +1,4 @@
-class responseException(Exception):
+class ResponseException(Exception):
     def __init__(self, msg, statusCode):
         self.msg = msg
         self.statusCode = statusCode

@@ -1,7 +1,7 @@
 from flask import Flask, request
 from flask_cors import CORS
 from model.user import User
-from model.responseException import responseException
+from model.responseException import ResponseException
 from mongoengine import connect
 from secrets import token_urlsafe
 from email.mime.text import MIMEText
@@ -15,7 +15,7 @@ import bcrypt, smtplib, jwt, pyotp, random, string, qrcode, configparser, dateti
 
 app = Flask(__name__)
 CORS(app, allow_headers=["Content-Type", "Authorization", "Accept-Language"], 
-     methods=["GET", "POST"],
+     methods=["GET", "POST", "PATCH"],
      origins="*",
     )
 
@@ -33,8 +33,11 @@ def postRegister():
         email = request.json["email"]
         password = request.json["password"]
 
+        if not "name" in request.json or not "email" in request.json or not "password" in request.json:
+            raise ResponseException("'name'/'email'/'password' expected", 400)
+
         if User.objects(email=email):
-            raise responseException(msg=f"User with e-mail: {email} already exists", statusCode=400)
+            raise ResponseException(msg=f"User with e-mail: {email} already exists", statusCode=400)
 
         salt =  bcrypt.gensalt(rounds=14)
         hashedPassword =  bcrypt.hashpw(str.encode(password), salt)
@@ -77,7 +80,7 @@ def postRegister():
         fp.close()
         image3.add_header('Content-ID', '<emailActivationIllustration>')
         message.attach(image3)
-        print(config['SMTP']['SMTP_SERVER'])
+
         server = smtplib.SMTP(config['SMTP']['SMTP_SERVER'], int(config['SMTP']['SMTP_PORT']))
         server.ehlo()
         server.starttls()
@@ -88,8 +91,8 @@ def postRegister():
 
         remove(qrcodeFullPathName)
 
-        return f"User created: {createdUser.id}", 201
-    except responseException as e:
+        return {"msg": f"User created: {createdUser.id}", "status": "success"}, 201
+    except ResponseException as e:
         return e.getErrorData(), e.statusCode
     except Exception as e:
         msg = {}
@@ -103,12 +106,12 @@ def getActivate():
     try:
         token = request.args.get('token')
         if not User.objects(activationToken=token):
-            raise responseException(f"Invalid token", 400)
+            raise ResponseException(f"Invalid token", 400)
     
         for user in User.objects(activationToken=token):
             user.update(status = 'active', activationToken = None)
-            return {"success_msg": f"User {user.id} updated (inactive - active)"}, 200
-    except responseException as e:
+            return {"msg": f"User {user.id} updated (inactive - active)", "status": "success"}, 200
+    except ResponseException as e:
         return e.getErrorData(), e.statusCode
     except Exception as e:
         msg = {}
@@ -126,13 +129,13 @@ def postLogin():
         
         for user in User.objects(email=email):
             if not pyotp.TOTP(b32encode(str.encode(user.mfaSecret))).now() == mfaKey:
-                raise responseException(f"Wrong TOTP value", 401)
+                raise ResponseException(f"Wrong TOTP value", 401)
 
             if not bcrypt.checkpw(str.encode(password), str.encode(user.password)):
-                raise responseException("Wrong Password", 401)
+                raise ResponseException("Wrong Password", 401)
 
             if not user.status == 'active':
-                raise responseException(f"User id:{user.id} is not active", 401)
+                raise ResponseException(f"User id:{user.id} is not active", 401)
             
             tokenExpiration = datetime.timedelta(minutes=30) + datetime.datetime.now() 
 
@@ -144,9 +147,9 @@ def postLogin():
             
             jwtToken = jwt.encode(payload=payload, key=JWT_SECRET)
                      
-        return jwtToken, 200
+        return {"msg": f"Login of user {str(user.id)} done", "status": "success", "JWT": f"{jwtToken}"}, 200
     
-    except responseException as e:
+    except ResponseException as e:
         return e.getErrorData(), e.statusCode
     except Exception as e:
         msg = {}
@@ -155,7 +158,51 @@ def postLogin():
         msg["status"] = "error"
         return msg, 500
 
-    
+@app.route("/update/<string:userId>", methods=["PATCH"])
+def patchUpdate(userId):
+    try:
+        authorizationJwt = request.headers.get('Authorization')
+        if not authorizationJwt:
+            raise ResponseException('Not authenticated', 401)
+        if not 'Bearer' in authorizationJwt:
+            raise ResponseException('Not authenticated', 401)
+        if not User.objects(id=userId):
+            raise ResponseException("Invalid user id", 400)
+            
+        authorizationJwt = authorizationJwt.split(' ')[1]
+        decodedJwt = (jwt.decode(authorizationJwt, JWT_SECRET, algorithms="HS256"))
+        print (datetime.datetime.strptime(decodedJwt["tokenExpiration"], '%Y-%m-%d %H:%M:%S.%f'))
+        if datetime.datetime.now() > datetime.datetime.strptime(decodedJwt["tokenExpiration"], '%Y-%m-%d %H:%M:%S.%f'):
+            raise ResponseException("JWT expired. Please login again", 401)
+
+        reqUser = None
+        for user in User.objects(id=decodedJwt["userId"]):
+            reqUser = user
+
+        if str(userId) != decodedJwt["userId"] and reqUser.role != 'admin':
+            raise ResponseException("You are not allowed to do this operation", 400)
+        
+        oldUser = None
+        for user in User.objects(id=userId):
+            oldUser = user
+
+        for dataKey in request.json:
+            if dataKey == 'name' or 'email':
+                setattr(oldUser, dataKey, request.json[dataKey])
+        
+        oldUser.save()
+
+        return {"msg": f"User {userId} updated", "status": "success"}, 200
+
+    except ResponseException as e:
+        return e.getErrorData(), e.statusCode
+    except Exception as e:
+        msg = {}
+        for x in e.__dict__:
+            msg[x] = str(e.__dict__[x])
+            msg["status"] = "error"
+            return msg, 500
+
 if __name__ == "__main__":
     try:
         connect(host=MONGODB_URI)
