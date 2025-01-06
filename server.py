@@ -11,14 +11,14 @@ from base64 import b32encode
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from uuid import uuid4
 from os import remove
+from util.checkPermissions import isAuth, isOwnOrAdmin
 import bcrypt, smtplib, jwt, pyotp, random, string, qrcode, configparser, datetime
 
 app = Flask(__name__)
 CORS(app, allow_headers=["Content-Type", "Authorization", "Accept-Language"], 
-     methods=["GET", "POST", "PATCH"],
+     methods=["GET", "POST", "PATCH", "DELETE"],
      origins="*",
     )
-
 
 config = configparser.ConfigParser()
 config.read('config.conf')
@@ -158,41 +158,44 @@ def postLogin():
         msg["status"] = "error"
         return msg, 500
 
-@app.route("/update/<string:userId>", methods=["PATCH"])
-def patchUpdate(userId):
-    try:
-        authorizationJwt = request.headers.get('Authorization')
-        if not authorizationJwt:
-            raise ResponseException('Not authenticated', 401)
-        if not 'Bearer' in authorizationJwt:
-            raise ResponseException('Not authenticated', 401)
-        if not User.objects(id=userId):
-            raise ResponseException("Invalid user id", 400)
-            
-        authorizationJwt = authorizationJwt.split(' ')[1]
-        decodedJwt = (jwt.decode(authorizationJwt, JWT_SECRET, algorithms="HS256"))
-        print (datetime.datetime.strptime(decodedJwt["tokenExpiration"], '%Y-%m-%d %H:%M:%S.%f'))
-        if datetime.datetime.now() > datetime.datetime.strptime(decodedJwt["tokenExpiration"], '%Y-%m-%d %H:%M:%S.%f'):
-            raise ResponseException("JWT expired. Please login again", 401)
+@app.route("/account/<string:userId>", methods=["PATCH"])
+def patchUpdateAccount(userId):
+    try:    
+        decodedJwt=isAuth(request, userId)
 
-        reqUser = None
-        for user in User.objects(id=decodedJwt["userId"]):
-            reqUser = user
-
-        if str(userId) != decodedJwt["userId"] and reqUser.role != 'admin':
-            raise ResponseException("You are not allowed to do this operation", 400)
+        isOwnOrAdmin(decodedJwt["userId"], userId)
         
-        oldUser = None
-        for user in User.objects(id=userId):
-            oldUser = user
+        user = User.objects(id=userId).first()
 
         for dataKey in request.json:
             if dataKey == 'name' or 'email':
-                setattr(oldUser, dataKey, request.json[dataKey])
+                setattr(user, dataKey, request.json[dataKey])
         
-        oldUser.save()
+        user.save()
 
         return {"msg": f"User {userId} updated", "status": "success"}, 200
+
+    except ResponseException as e:
+        return e.getErrorData(), e.statusCode
+    except Exception as e:
+        msg = {}
+        for x in e.__dict__:
+            msg[x] = str(e.__dict__[x])
+            msg["status"] = "error"
+            return msg, 500
+        
+@app.route("/account/<string:userId>", methods=["DELETE"])
+def deleteDeleteAccount(userId):
+    try:    
+        decodedJwt=isAuth(request, userId)
+        
+        isOwnOrAdmin(decodedJwt["userId"], userId)
+
+        user = User.objects(id=userId).first()
+        
+        user.delete()
+
+        return {"msg": f"User {userId} deleted", "status": "success"}, 200
 
     except ResponseException as e:
         return e.getErrorData(), e.statusCode
