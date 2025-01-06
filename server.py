@@ -189,9 +189,10 @@ def patchUpdateAccount(userId):
                     raise ResponseException("An user with this e-mail already exists", 400)
             elif dataKey == 'password' and len(request.json["password"]) <= 5:
                 raise ResponseException("Password too short", 400)
-            elif dataKey == 'status':
-                if reqUser.role != 'admin':
-                    raise ResponseException("You are not allowed to change the status", 401)
+            elif dataKey == 'status' and reqUser.role != 'admin':
+                raise ResponseException("You are not allowed to change the status", 401)
+            elif dataKey == 'role' and reqUser.role != 'admin':
+                raise ResponseException("You are not allowed to change the status", 401)
             else:
                 setattr(user, dataKey, request.json[dataKey])
         
