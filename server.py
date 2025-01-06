@@ -193,6 +193,8 @@ def patchUpdateAccount(userId):
                 raise ResponseException("You are not allowed to change the status", 401)
             elif dataKey == 'role' and reqUser.role != 'admin':
                 raise ResponseException("You are not allowed to change the status", 401)
+            elif dataKey == 'activationToken' or dataKey == 'mfaSecret':
+                raise ResponseException("You are not allowed to change the status", 401)
             else:
                 setattr(user, dataKey, request.json[dataKey])
         
