@@ -182,8 +182,11 @@ def patchUpdateAccount(userId):
         user = User.objects(id=userId).first()
 
         for dataKey in request.json:
-            if dataKey == 'email' and not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', request.json[dataKey]):
-                raise ResponseException("E-mail is not valid", 400)
+            if dataKey == 'email':
+                if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', request.json[dataKey]):
+                    raise ResponseException("E-mail is not valid", 400)
+                if User.objects(email=request.json[dataKey]):
+                    raise ResponseException("An user with this e-mail already exists", 400)
             elif dataKey == 'password' and len(request.json["password"]) <= 5:
                 raise ResponseException("Password too short", 400)
             elif dataKey == 'status':
