@@ -30,4 +30,6 @@ def isOwnOrAdmin(reqUserId, userId):
 
     if str(userId) != reqUserId and reqUser.role != 'admin':
         raise ResponseException("You are not allowed to do this operation", 400)
+    else:
+         return reqUser
         

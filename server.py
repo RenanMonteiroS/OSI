@@ -12,7 +12,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from uuid import uuid4
 from os import remove
 from util.checkPermissions import isAuth, isOwnOrAdmin
-import bcrypt, smtplib, jwt, pyotp, random, string, qrcode, configparser, datetime
+import bcrypt, smtplib, jwt, pyotp, random, string, qrcode, configparser, datetime, re
 
 app = Flask(__name__)
 CORS(app, allow_headers=["Content-Type", "Authorization", "Accept-Language"], 
@@ -29,12 +29,18 @@ JWT_SECRET = config['JWT']['JWT_SECRET']
 @app.route("/register", methods=["POST"])
 def postRegister():
     try:
+        if not "name" in request.json or not "email" in request.json or not "password" in request.json:
+            raise ResponseException("'name'/'email'/'password' expected", 400)
+
         name = request.json["name"]
         email = request.json["email"]
         password = request.json["password"]
 
-        if not "name" in request.json or not "email" in request.json or not "password" in request.json:
-            raise ResponseException("'name'/'email'/'password' expected", 400)
+        if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+            raise ResponseException("E-mail is not valid", 400)
+
+        if len(password) <= 5:
+            raise ResponseException("Password too short", 400)
 
         if User.objects(email=email):
             raise ResponseException(msg=f"User with e-mail: {email} already exists", statusCode=400)
@@ -163,12 +169,19 @@ def patchUpdateAccount(userId):
     try:    
         decodedJwt=isAuth(request, userId)
 
-        isOwnOrAdmin(decodedJwt["userId"], userId)
+        reqUser = isOwnOrAdmin(decodedJwt["userId"], userId)
         
         user = User.objects(id=userId).first()
 
         for dataKey in request.json:
-            if dataKey == 'name' or 'email':
+            if dataKey == 'email' and not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', request.json[dataKey]):
+                raise ResponseException("E-mail is not valid", 400)
+            elif dataKey == 'password' and len(request.json["password"]) <= 5:
+                raise ResponseException("Password too short", 400)
+            elif dataKey == 'status':
+                if reqUser.role != 'admin':
+                    raise ResponseException("You are not allowed to change the status", 401)
+            else:
                 setattr(user, dataKey, request.json[dataKey])
         
         user.save()
