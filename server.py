@@ -1,5 +1,7 @@
 from flask import Flask, request
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from model.user import User
 from model.responseException import ResponseException
 from mongoengine import connect
@@ -19,6 +21,11 @@ CORS(app, allow_headers=["Content-Type", "Authorization", "Accept-Language"],
      methods=["GET", "POST", "PATCH", "DELETE"],
      origins="*",
     )
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["20 per hour"],
+)
 
 config = configparser.ConfigParser()
 config.read('config.conf')
@@ -27,6 +34,7 @@ MONGODB_URI = config['DATABASE']['MONGODB_URI']
 JWT_SECRET = config['JWT']['JWT_SECRET']
 
 @app.route("/register", methods=["POST"])
+@limiter.limit("5 per minute")
 def postRegister():
     try:
         if not "name" in request.json or not "email" in request.json or not "password" in request.json:

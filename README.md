@@ -115,6 +115,7 @@ The generated JWT uses the secret configured in `config.conf` file, in the [JWT]
 - [x] Code Improvement - Better error handling
 - [x] Code Improvement - `created_at` and `modified_at` column in User class/document 
 - [x] Code Improvement - JWT with expiration time payload attribute and validation
+- [x] Code Improvement - Create rate limit
 - [ ] Feature - JWT RS256 based support 
 - [ ] Feature - Create DockerFile
 - [X] Feature - Create file with required packages to `pip install -r requirements.txt`
