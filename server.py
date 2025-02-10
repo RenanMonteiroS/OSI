@@ -33,10 +33,22 @@ config.read('config.conf')
 MONGODB_URI = config['DATABASE']['MONGODB_URI']
 JWT_SECRET = config['JWT']['JWT_SECRET']
 
+@app.errorhandler(ResponseException)
+def ResponseExceptionError(e):
+    return e.getErrorData(), e.statusCode
+
+@app.errorhandler(Exception)
+def genericError(e):
+    msg = {}
+    for x in e.__dict__:
+        msg[x] = str(e.__dict__[x])
+    msg["status"] = "error"
+    return msg, 500
+
 @app.route("/register", methods=["POST"])
 @limiter.limit("5 per minute")
 def postRegister():
-    try:
+    
         if not "name" in request.json or not "email" in request.json or not "password" in request.json:
             raise ResponseException("'name'/'email'/'password' expected", 400)
 
@@ -53,9 +65,11 @@ def postRegister():
         if User.objects(email=email):
             raise ResponseException(msg=f"User with e-mail: {email} already exists", statusCode=400)
 
+        
         salt =  bcrypt.gensalt(rounds=14)
         hashedPassword =  bcrypt.hashpw(str.encode(password), salt)
         hashedPassword = hashedPassword.decode()
+            
         
         mfaSecret = ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(16))
         totp = pyotp.TOTP(b32encode(str.encode(mfaSecret)))
@@ -104,155 +118,103 @@ def postRegister():
         remove(qrcodeFullPathName)
 
         return {"msg": f"User created: {createdUser.id}", "status": "success"}, 201
-    except ResponseException as e:
-        return e.getErrorData(), e.statusCode
-    except Exception as e:
-        msg = {}
-        for x in e.__dict__:
-            msg[x] = str(e.__dict__[x])
-        msg["status"] = "error"
-        return msg, 500
+        
 
 @app.route("/activate", methods=["GET"])
 def getActivate():
-    try:
-        token = request.args.get('token')
-        if not User.objects(activationToken=token):
-            raise ResponseException(f"Invalid token", 400)
+    token = request.args.get('token')
+    if not User.objects(activationToken=token):
+        raise ResponseException(f"Invalid token", 400)
     
-        for user in User.objects(activationToken=token):
-            user.update(status = 'active', activationToken = None)
-            return {"msg": f"User {user.id} updated (inactive - active)", "status": "success"}, 200
-    except ResponseException as e:
-        return e.getErrorData(), e.statusCode
-    except Exception as e:
-        msg = {}
-        for x in e.__dict__:
-            msg[x] = str(e.__dict__[x])
-        msg["status"] = "error"
-        return msg, 500
+    for user in User.objects(activationToken=token):
+        user.update(status = 'active', activationToken = None)
+    
+    return {"msg": f"User {user.id} updated (inactive - active)", "status": "success"}, 200
     
 @app.route("/login", methods=["POST"])
 def postLogin():
-    try:
-        email = request.json["email"]
-        password = request.json["password"]
-        mfaKey = request.json["mfaKey"]
+    email = request.json["email"]
+    password = request.json["password"]
+    mfaKey = request.json["mfaKey"]
         
-        for user in User.objects(email=email):
-            if not pyotp.TOTP(b32encode(str.encode(user.mfaSecret))).now() == mfaKey:
-                raise ResponseException(f"Wrong TOTP value", 401)
+    for user in User.objects(email=email):
+        if not pyotp.TOTP(b32encode(str.encode(user.mfaSecret))).now() == mfaKey:
+            raise ResponseException(f"Wrong TOTP value", 401)
 
-            if not bcrypt.checkpw(str.encode(password), str.encode(user.password)):
-                raise ResponseException("Wrong Password", 401)
+        if not bcrypt.checkpw(str.encode(password), str.encode(user.password)):
+            raise ResponseException("Wrong Password", 401)
 
-            if not user.status == 'active':
-                raise ResponseException(f"User id:{user.id} is not active", 401)
+        if not user.status == 'active':
+            raise ResponseException(f"User id:{user.id} is not active", 401)
+           
+        tokenExpiration = datetime.timedelta(minutes=30) + datetime.datetime.now() 
+
+        payload = {
+           "userEmail": user.email,
+            "userId": str(user.id),
+            "tokenExpiration": str(tokenExpiration)
+        }
             
-            tokenExpiration = datetime.timedelta(minutes=30) + datetime.datetime.now() 
-
-            payload = {
-                "userEmail": user.email,
-                "userId": str(user.id),
-                "tokenExpiration": str(tokenExpiration)
-            }
-            
-            jwtToken = jwt.encode(payload=payload, key=JWT_SECRET)
+        jwtToken = jwt.encode(payload=payload, key=JWT_SECRET)
                      
-        return {"msg": f"Login of user {str(user.id)} done", "status": "success", "JWT": f"{jwtToken}"}, 200
-    
-    except ResponseException as e:
-        return e.getErrorData(), e.statusCode
-    except Exception as e:
-        msg = {}
-        for x in e.__dict__:
-            msg[x] = str(e.__dict__[x])
-        msg["status"] = "error"
-        return msg, 500
+        return {"msg": f"Login of user {str(user.id)} done", "status": "success", "JWT": f"{jwtToken}"}, 200 
 
 @app.route("/account/<string:userId>", methods=["PATCH"])
 def patchUpdateAccount(userId):
-    try:    
-        decodedJwt=isAuth(request)
+    decodedJwt=isAuth(request)
 
-        if not User.objects(id=userId):
-            raise ResponseException("Invalid user id", 400)
+    if not User.objects(id=userId):
+        raise ResponseException("Invalid user id", 400)
 
-        reqUser = isOwnOrAdmin(decodedJwt["userId"], userId)
+    reqUser = isOwnOrAdmin(decodedJwt["userId"], userId)
         
-        user = User.objects(id=userId).first()
+    user = User.objects(id=userId).first()
 
-        for dataKey in request.json:
-            if dataKey == 'email':
-                if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', request.json[dataKey]):
-                    raise ResponseException("E-mail is not valid", 400)
-                if User.objects(email=request.json[dataKey]):
+    for dataKey in request.json:
+        if dataKey == 'email':
+            if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', request.json[dataKey]):
+                raise ResponseException("E-mail is not valid", 400)
+            if User.objects(email=request.json[dataKey]):
                     raise ResponseException("An user with this e-mail already exists", 400)
-            elif dataKey == 'password' and len(request.json["password"]) <= 5:
-                raise ResponseException("Password too short", 400)
-            elif dataKey == 'status' and reqUser.role != 'admin':
-                raise ResponseException("You are not allowed to change the status", 401)
-            elif dataKey == 'role' and reqUser.role != 'admin':
-                raise ResponseException("You are not allowed to change the status", 401)
-            elif dataKey == 'activationToken' or dataKey == 'mfaSecret':
-                raise ResponseException("You are not allowed to change the status", 401)
-            else:
-                setattr(user, dataKey, request.json[dataKey])
+        elif dataKey == 'password' and len(request.json["password"]) <= 5:
+            raise ResponseException("Password too short", 400)
+        elif dataKey == 'status' and reqUser.role != 'admin':
+            raise ResponseException("You are not allowed to change the status", 401)
+        elif dataKey == 'role' and reqUser.role != 'admin':
+            raise ResponseException("You are not allowed to change the status", 401)
+        elif dataKey == 'activationToken' or dataKey == 'mfaSecret':
+            raise ResponseException("You are not allowed to change the status", 401)
+        else:
+            setattr(user, dataKey, request.json[dataKey])
         
         user.save()
 
         return {"msg": f"User {userId} updated", "status": "success"}, 200
 
-    except ResponseException as e:
-        return e.getErrorData(), e.statusCode
-    except Exception as e:
-        msg = {}
-        for x in e.__dict__:
-            msg[x] = str(e.__dict__[x])
-            msg["status"] = "error"
-            return msg, 500
         
 @app.route("/account/<string:userId>", methods=["DELETE"])
 def deleteDeleteAccount(userId):
-    try:    
-        decodedJwt=isAuth(request)
+    decodedJwt=isAuth(request)
         
-        isOwnOrAdmin(decodedJwt["userId"], userId)
+    isOwnOrAdmin(decodedJwt["userId"], userId)
 
-        if not User.objects(id=userId):
-            raise ResponseException("Invalid user id", 400)
+    if not User.objects(id=userId):
+        raise ResponseException("Invalid user id", 400)
 
-        user = User.objects(id=userId).first()
+    user = User.objects(id=userId).first()
         
-        user.delete()
+    user.delete()
 
-        return {"msg": f"User {userId} deleted", "status": "success"}, 200
+    return {"msg": f"User {userId} deleted", "status": "success"}, 200
 
-    except ResponseException as e:
-        return e.getErrorData(), e.statusCode
-    except Exception as e:
-        msg = {}
-        for x in e.__dict__:
-            msg[x] = str(e.__dict__[x])
-            msg["status"] = "error"
-            return msg, 500
         
 @app.route("/isValid", methods=["GET"])
 def isValid():
-    try:
-        decodedJwt = isAuth(request)
-        if not decodedJwt: 
-            raise ResponseException("Cannot decode JWT", 400)
+    decodedJwt = isAuth(request)
+    if not decodedJwt: 
+        raise ResponseException("Cannot decode JWT", 400)
         
-        return {"msg": f"JWT is valid", "status": "success"}, 200
-    except ResponseException as e:
-        return e.getErrorData(), e.statusCode
-    except Exception as e:
-        msg = {}
-        for x in e.__dict__:
-            msg[x] = str(e.__dict__[x])
-            msg["status"] = "error"
-            return msg, 500
+    return {"msg": f"JWT is valid", "status": "success"}, 200
 
 if __name__ == "__main__":
     try:
