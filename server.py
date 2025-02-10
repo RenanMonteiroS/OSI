@@ -56,16 +56,16 @@ def postRegister():
         salt =  bcrypt.gensalt(rounds=14)
         hashedPassword =  bcrypt.hashpw(str.encode(password), salt)
         hashedPassword = hashedPassword.decode()
-
+        
         mfaSecret = ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(16))
         totp = pyotp.TOTP(b32encode(str.encode(mfaSecret)))
-
+        
         qrcodeFullPathName = f'./templates/static/images/qrcode-{uuid4()}.png'
         img = qrcode.make(totp.provisioning_uri(name=email, issuer_name=f'{config['COMPANY_INFO']['COMPANY_NAME']} OSI'))
         img.save(qrcodeFullPathName)
         
         createdUser = User(name=name, email=email, password=hashedPassword, activationToken=token_urlsafe(), mfaSecret=mfaSecret).save()
-
+        
         env = Environment(
             loader=FileSystemLoader('./templates/'),
             autoescape=select_autoescape(['html', 'xml'])
@@ -94,7 +94,6 @@ def postRegister():
         fp.close()
         image3.add_header('Content-ID', '<emailActivationIllustration>')
         message.attach(image3)
-
         server = smtplib.SMTP(config['SMTP']['SMTP_SERVER'], int(config['SMTP']['SMTP_PORT']))
         server.ehlo()
         server.starttls()
@@ -102,7 +101,6 @@ def postRegister():
         server.login(config['SMTP']['SMTP_USER'], config['SMTP']['SMTP_PASSWORD'])
         server.sendmail(config['SMTP']['SMTP_EMAILSENDER'], createdUser.email, message.as_string())
         server.quit()
-
         remove(qrcodeFullPathName)
 
         return {"msg": f"User created: {createdUser.id}", "status": "success"}, 201
@@ -175,7 +173,10 @@ def postLogin():
 @app.route("/account/<string:userId>", methods=["PATCH"])
 def patchUpdateAccount(userId):
     try:    
-        decodedJwt=isAuth(request, userId)
+        decodedJwt=isAuth(request)
+
+        if not User.objects(id=userId):
+            raise ResponseException("Invalid user id", 400)
 
         reqUser = isOwnOrAdmin(decodedJwt["userId"], userId)
         
@@ -214,9 +215,12 @@ def patchUpdateAccount(userId):
 @app.route("/account/<string:userId>", methods=["DELETE"])
 def deleteDeleteAccount(userId):
     try:    
-        decodedJwt=isAuth(request, userId)
+        decodedJwt=isAuth(request)
         
         isOwnOrAdmin(decodedJwt["userId"], userId)
+
+        if not User.objects(id=userId):
+            raise ResponseException("Invalid user id", 400)
 
         user = User.objects(id=userId).first()
         
@@ -224,6 +228,23 @@ def deleteDeleteAccount(userId):
 
         return {"msg": f"User {userId} deleted", "status": "success"}, 200
 
+    except ResponseException as e:
+        return e.getErrorData(), e.statusCode
+    except Exception as e:
+        msg = {}
+        for x in e.__dict__:
+            msg[x] = str(e.__dict__[x])
+            msg["status"] = "error"
+            return msg, 500
+        
+@app.route("/isValid", methods=["GET"])
+def isValid():
+    try:
+        decodedJwt = isAuth(request)
+        if not decodedJwt: 
+            raise ResponseException("Cannot decode JWT", 400)
+        
+        return {"msg": f"JWT is valid", "status": "success"}, 200
     except ResponseException as e:
         return e.getErrorData(), e.statusCode
     except Exception as e:
