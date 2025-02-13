@@ -1,3 +1,4 @@
+import logging
 from flask import Flask, request
 from flask_cors import CORS
 from flask_limiter import Limiter
@@ -30,15 +31,19 @@ limiter = Limiter(
 config = configparser.ConfigParser()
 config.read('config.conf')
 
+logger = logging.getLogger(__name__)
+
 MONGODB_URI = config['DATABASE']['MONGODB_URI']
 JWT_SECRET = config['JWT']['JWT_SECRET']
 
 @app.errorhandler(ResponseException)
 def ResponseExceptionError(e):
+    logger.exception(e)
     return e.getErrorData(), e.statusCode
 
 @app.errorhandler(Exception)
 def genericError(e):
+    logger.exception(e)
     msg = {}
     for x in e.__dict__:
         msg[x] = str(e.__dict__[x])
@@ -79,7 +84,8 @@ def postRegister():
         img.save(qrcodeFullPathName)
         
         createdUser = User(name=name, email=email, password=hashedPassword, activationToken=token_urlsafe(), mfaSecret=mfaSecret).save()
-        
+        logger.info(f"User {createdUser.id} created.")
+
         env = Environment(
             loader=FileSystemLoader('./templates/'),
             autoescape=select_autoescape(['html', 'xml'])
@@ -115,6 +121,9 @@ def postRegister():
         server.login(config['SMTP']['SMTP_USER'], config['SMTP']['SMTP_PASSWORD'])
         server.sendmail(config['SMTP']['SMTP_EMAILSENDER'], createdUser.email, message.as_string())
         server.quit()
+
+        logger.info(f"Activation e-mail sended.")
+
         remove(qrcodeFullPathName)
 
         return {"msg": f"User created: {createdUser.id}", "status": "success"}, 201
@@ -128,6 +137,7 @@ def getActivate():
     
     for user in User.objects(activationToken=token):
         user.update(status = 'active', activationToken = None)
+        logger.info(f"User {str(user.id)} activated.")
     
     return {"msg": f"User {user.id} updated (inactive - active)", "status": "success"}, 200
     
@@ -156,6 +166,8 @@ def postLogin():
         }
             
         jwtToken = jwt.encode(payload=payload, key=JWT_SECRET)
+
+        logger.info(f"User {str(user.id)} logged in.")
                      
         return {"msg": f"Login of user {str(user.id)} done", "status": "success", "JWT": f"{jwtToken}"}, 200 
 
@@ -188,6 +200,7 @@ def patchUpdateAccount(userId):
             setattr(user, dataKey, request.json[dataKey])
         
         user.save()
+        logger.info(f"User {userId} updated by user {decodedJwt["userId"]}")
 
         return {"msg": f"User {userId} updated", "status": "success"}, 200
 
@@ -204,6 +217,7 @@ def deleteDeleteAccount(userId):
     user = User.objects(id=userId).first()
         
     user.delete()
+    logger.info(f"User {userId} deleted by user {decodedJwt["userId"]}")
 
     return {"msg": f"User {userId} deleted", "status": "success"}, 200
 
@@ -218,7 +232,25 @@ def isValid():
 
 if __name__ == "__main__":
     try:
+        logger.setLevel(logging.DEBUG)
+        log_levels = {
+            logging.DEBUG: './logs/debug.log',
+            logging.INFO: './logs/info.log',
+            logging.WARNING: './logs/warning.log',
+            logging.ERROR: './logs/error.log',
+            logging.CRITICAL: './logs/critical.log',
+        }
+
+        for level, filename in log_levels.items():
+            handler = logging.FileHandler(filename)
+            handler.setLevel(level)  # Set the handler to only handle this level
+            formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
+
         connect(host=MONGODB_URI)
+        logger.info(f"Database connected")
         app.run(port=8080, debug=True)
     except Exception as e:
+        logger.critical(f"Error trying to connect to database: {e}")
         print(e)
