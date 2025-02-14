@@ -13,3 +13,4 @@ Django==5.1.4
 Flask-WTF==1.2.2 
 wtforms==3.2.1
 Flask-Limiter==3.0.10
+Flask-Reuploaded==1.4.0

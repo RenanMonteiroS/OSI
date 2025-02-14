@@ -10,27 +10,27 @@ from secrets import token_urlsafe
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
-from cryptography.hazmat.primitives import serialization
 from base64 import b32encode
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from uuid import uuid4
 from os import remove
-from util.checkPermissions import isAuth, isOwnOrAdmin
-import bcrypt, smtplib, jwt, pyotp, random, string, qrcode, configparser, datetime, re
+from util.checkPermissions import isAuth, isOwnOrAdmin, isAdmin
+from flask_uploads import UploadSet, IMAGES, configure_uploads
+import bcrypt, smtplib, jwt, pyotp, random, string, qrcode, configparser, datetime, re, os
 
 config = configparser.ConfigParser()
 config.read('config.conf')
-
 
 MONGODB_URI = config['DATABASE']['MONGODB_URI']
 JWT_SECRET = config['JWT']['JWT_SECRET']
 LIMITER_STORAGE_URL = config['LIMITER']['LIMITER_STORAGE_URL']
 LIMITER_STRATEGY = config['LIMITER']['LIMITER_STRATEGY'] or "fixed-window"
-print(LIMITER_STORAGE_URL, LIMITER_STRATEGY)
+JWT_ALGORITHM = config['JWT']['JWT_ALGORITHM'] or 'HS256'
+
 app = Flask(__name__)
 
 CORS(app, allow_headers=["Content-Type", "Authorization", "Accept-Language"], 
-     methods=["GET", "POST", "PATCH", "DELETE"],
+     methods=["GET", "POST", "PATCH", "DELETE", "PUT"],
      origins="*",
     )
 
@@ -41,6 +41,12 @@ limiter = Limiter(
     storage_uri=LIMITER_STORAGE_URL,
     strategy=LIMITER_STRATEGY
 )
+
+app.config['UPLOADED_IMAGES_DEST'] = os.path.join('templates', 'static', 'images')
+app.config['UPLOADED_IMAGES_ALLOW'] = IMAGES
+images = UploadSet('images', IMAGES)
+configure_uploads(app, images)
+
 
 logger = logging.getLogger(__name__)
 
@@ -174,16 +180,16 @@ def postLogin():
             "tokenExpiration": str(tokenExpiration)
         }
             
-        if not config['JWT']['JWT_ALGORITHM']:
-            JWT_ALGORITHM = 'HS256'
+        if JWT_ALGORITHM == 'HS256':
+            JWT_SECRET = config['JWT']['JWT_SECRET']
             jwtToken = jwt.encode(payload=payload, key=JWT_SECRET, algorithm=JWT_ALGORITHM)
-        else:
-            JWT_ALGORITHM = config['JWT']['JWT_ALGORITHM']
-            
+        elif JWT_ALGORITHM == 'RS256':
             with open(config['JWT']['JWT_PRIVATE_KEY_PATH'], 'r') as f:
-                private_key = f.read()
+                PRIVATE_KEY = f.read()
 
-            jwtToken = jwt.encode(payload=payload, key=private_key, algorithm=JWT_ALGORITHM)
+            jwtToken = jwt.encode(payload=payload, key=PRIVATE_KEY, algorithm=JWT_ALGORITHM)
+        else:
+            raise ResponseException("Invalid JWT encryption method", 400)
             
         logger.info(f"User {str(user.id)} logged in.")
                      
@@ -248,6 +254,25 @@ def isValid():
         
     return {"msg": f"JWT is valid", "status": "success"}, 200
 
+@app.route("/uploadLogo", methods=["PUT"])
+def uploadLogo():
+    decodedJwt = isAuth(request)
+    isAdmin(decodedJwt["userId"])
+
+    if 'file' not in request.files:
+        return ResponseException("Any file was found. Please upload it", 400)
+    
+    file = request.files["file"]
+
+    if file.filename == '':
+        return ResponseException("File is empty", 400)
+
+    filepath = os.path.join(app.config['UPLOADED_IMAGES_DEST'], 'logo.png')
+    file.save(filepath)
+
+    return {"msg": f"Logo uploaded at path {filepath}", "status": "success"}, 201
+    
+
 if __name__ == "__main__":
     try:
         logger.setLevel(logging.DEBUG)
@@ -272,3 +297,4 @@ if __name__ == "__main__":
     except Exception as e:
         logger.critical(f"Error trying to connect to database: {e}")
         print(e)
+
