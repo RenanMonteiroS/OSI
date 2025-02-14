@@ -2,3 +2,7 @@ config.conf
 templates/static/images/logo.png
 model/__pycache__
 logs/*
+*/__pycache__
+*.key
+*.pub
+*.key

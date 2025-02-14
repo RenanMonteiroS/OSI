@@ -10,6 +10,7 @@ from secrets import token_urlsafe
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
+from cryptography.hazmat.primitives import serialization
 from base64 import b32encode
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from uuid import uuid4
@@ -165,8 +166,17 @@ def postLogin():
             "tokenExpiration": str(tokenExpiration)
         }
             
-        jwtToken = jwt.encode(payload=payload, key=JWT_SECRET)
+        if not config['JWT']['JWT_ALGORITHM']:
+            JWT_ALGORITHM = 'HS256'
+            jwtToken = jwt.encode(payload=payload, key=JWT_SECRET, algorithm=JWT_ALGORITHM)
+        else:
+            JWT_ALGORITHM = config['JWT']['JWT_ALGORITHM']
+            
+            with open(config['JWT']['JWT_PRIVATE_KEY_PATH'], 'r') as f:
+                private_key = f.read()
 
+            jwtToken = jwt.encode(payload=payload, key=private_key, algorithm=JWT_ALGORITHM)
+            
         logger.info(f"User {str(user.id)} logged in.")
                      
         return {"msg": f"Login of user {str(user.id)} done", "status": "success", "JWT": f"{jwtToken}"}, 200 
@@ -248,7 +258,7 @@ if __name__ == "__main__":
             handler.setFormatter(formatter)
             logger.addHandler(handler)
 
-        connect(host=MONGODB_URI)
+        connect(host=MONGODB_URI, maxPoolSize=50)
         logger.info(f"Database connected")
         app.run(port=8080, debug=True)
     except Exception as e:

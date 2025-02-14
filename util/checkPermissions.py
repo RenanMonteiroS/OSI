@@ -16,7 +16,19 @@ def isAuth(request):
         
     
     authorizationJwt = authorizationJwt.split(' ')[1]
-    decodedJwt = (jwt.decode(authorizationJwt, JWT_SECRET, algorithms="HS256"))
+
+    if not config['JWT']['JWT_ALGORITHM']:
+        JWT_ALGORITHM = 'HS256'
+        decodedJwt = (jwt.decode(authorizationJwt, JWT_SECRET, algorithms=JWT_ALGORITHM))
+    else:
+        JWT_ALGORITHM = config['JWT']['JWT_ALGORITHM']
+            
+        with open(config['JWT']['JWT_PUBLIC_KEY_PATH'], 'r') as f:
+            public_key = f.read()
+
+        JWT_ALGORITHM = config['JWT']['JWT_ALGORITHM']
+        decodedJwt = (jwt.decode(authorizationJwt, public_key, algorithms=JWT_ALGORITHM))
+
 
     if not User.objects(id=decodedJwt["userId"]) or not User.objects(email=decodedJwt["userEmail"]):
          raise ResponseException("This JWT has not a user associated with. Please try again with a valid user", 400)
