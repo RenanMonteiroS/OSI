@@ -18,24 +18,32 @@ from os import remove
 from util.checkPermissions import isAuth, isOwnOrAdmin
 import bcrypt, smtplib, jwt, pyotp, random, string, qrcode, configparser, datetime, re
 
+config = configparser.ConfigParser()
+config.read('config.conf')
+
+
+MONGODB_URI = config['DATABASE']['MONGODB_URI']
+JWT_SECRET = config['JWT']['JWT_SECRET']
+LIMITER_STORAGE_URL = config['LIMITER']['LIMITER_STORAGE_URL']
+LIMITER_STRATEGY = config['LIMITER']['LIMITER_STRATEGY'] or "fixed-window"
+print(LIMITER_STORAGE_URL, LIMITER_STRATEGY)
 app = Flask(__name__)
+
 CORS(app, allow_headers=["Content-Type", "Authorization", "Accept-Language"], 
      methods=["GET", "POST", "PATCH", "DELETE"],
      origins="*",
     )
+
 limiter = Limiter(
     get_remote_address,
     app=app,
     default_limits=["20 per hour"],
+    storage_uri=LIMITER_STORAGE_URL,
+    strategy=LIMITER_STRATEGY
 )
-
-config = configparser.ConfigParser()
-config.read('config.conf')
 
 logger = logging.getLogger(__name__)
 
-MONGODB_URI = config['DATABASE']['MONGODB_URI']
-JWT_SECRET = config['JWT']['JWT_SECRET']
 
 @app.errorhandler(ResponseException)
 def ResponseExceptionError(e):
