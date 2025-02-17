@@ -78,6 +78,8 @@ def postRegister():
 
         if len(password) <= 5:
             raise ResponseException("Password too short", 400)
+        if not re.match(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[\W_]).+$', password):
+            raise ResponseException("Password does not correspond to the  set of required characters (special, uppercase, lowercase and number)", 400)
 
         if User.objects(email=email):
             raise ResponseException(msg=f"User with e-mail: {email} already exists", statusCode=400)
@@ -209,6 +211,8 @@ def patchUpdateAccount(userId, reqUser):
         elif dataKey == 'password':
             if len(request.json["password"]) <= 5:
                 raise ResponseException("Password too short", 400)
+            if not re.match(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[\W_]).+$', request.json["password"]):
+                raise ResponseException("Password does not correspond to the  set of required characters (special, uppercase, lowercase and number)", 400)
             else:
                 salt =  bcrypt.gensalt(rounds=14)
                 hashedPassword =  bcrypt.hashpw(str.encode(request.json[dataKey]), salt)
