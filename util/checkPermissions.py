@@ -1,9 +1,10 @@
 from functools import wraps
 from model.responseException import ResponseException
 from model.user import User
-from flask import request, make_response, jsonify
+from flask import request, make_response, jsonify, Response
 from jwt.exceptions import DecodeError
 import jwt, configparser, datetime
+import inspect
 
 config = configparser.ConfigParser()
 config.read('config.conf')
@@ -40,30 +41,23 @@ def isAuth(request):
         return decodedJwt
     
     except ResponseException as e:
-        return e.getErrorData(), e.statusCode
+        return make_response(e.getErrorData(), e.statusCode)
     
     except DecodeError as e:
-        return jsonify({"msg": e}, 500)
+        return make_response({"msg": e}, 500)
 
     except Exception as e:
-        return jsonify({"msg": e}, 500)
+        return make_response({"msg": e}, 500)
 
-
-#def isOwnOrAdmin(reqUserId, userId):
-#    reqUser = None
-#    for user in User.objects(id=reqUserId):
-#            reqUser = user
-#
-#    if str(userId) != reqUserId and reqUser.role != 'admin':
-#        raise ResponseException("You are not allowed to do this operation", 401)
-#    else:
-#         return reqUser
 
 def isOwnOrAdmin(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         try:
             decodedJwt = isAuth(request)
+            if isinstance(decodedJwt, Response):
+                return decodedJwt
+            
             reqUserId = decodedJwt["userId"]
             reqUser = None
 
@@ -82,21 +76,14 @@ def isOwnOrAdmin(func):
         
     return wrapper
 
-#def isAdmin(reqUserId):
-#    reqUser = None
-#    for user in User.objects(id=reqUserId):
-#            reqUser = user
-#
-#    if reqUser.role != 'admin':
-#        raise ResponseException("You are not allowed to do this operation", 400)
-#    
-#    return reqUser
-
-
 def isAdmin(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         decodedJwt = isAuth(request)
+        
+        if isinstance(decodedJwt, Response):
+                return decodedJwt
+        
         reqUserId = decodedJwt["userId"]
         reqUser = None
 
