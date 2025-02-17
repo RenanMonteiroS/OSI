@@ -1,4 +1,5 @@
 import logging
+from logging.handlers import RotatingFileHandler
 from flask import Flask, request
 from flask_cors import CORS
 from flask_limiter import Limiter
@@ -30,14 +31,14 @@ JWT_ALGORITHM = config['JWT']['JWT_ALGORITHM'] or 'HS256'
 app = Flask(__name__)
 
 CORS(app, allow_headers=["Content-Type", "Authorization", "Accept-Language"], 
-     methods=["GET", "POST", "PATCH", "DELETE", "PUT"],
+     methods=["GET", "POST", "PATCH", "DELETE", "PUT", "OPTIONS"],
      origins="*",
     )
 
 limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=["20 per hour"],
+    default_limits=["500 per hour"],
     storage_uri=LIMITER_STORAGE_URL,
     strategy=LIMITER_STRATEGY
 )
@@ -52,18 +53,14 @@ logger = logging.getLogger(__name__)
 
 
 @app.errorhandler(ResponseException)
-def ResponseExceptionError(e):
+def responseExceptionError(e):
     logger.exception(e)
     return e.getErrorData(), e.statusCode
 
 @app.errorhandler(Exception)
 def genericError(e):
     logger.exception(e)
-    msg = {}
-    for x in e.__dict__:
-        msg[x] = str(e.__dict__[x])
-    msg["status"] = "error"
-    return msg, 500
+    return {"msg": e, "status": "error"}, 500
 
 @app.route("/register", methods=["POST"])
 @limiter.limit("5 per minute")
@@ -196,52 +193,53 @@ def postLogin():
         return {"msg": f"Login of user {str(user.id)} done", "status": "success", "JWT": f"{jwtToken}"}, 200 
 
 @app.route("/account/<string:userId>", methods=["PATCH"])
-def patchUpdateAccount(userId):
-    decodedJwt=isAuth(request)
-
-    if not User.objects(id=userId):
-        raise ResponseException("Invalid user id", 400)
-
-    reqUser = isOwnOrAdmin(decodedJwt["userId"], userId)
-        
+@isOwnOrAdmin
+def patchUpdateAccount(userId, reqUser):
     user = User.objects(id=userId).first()
+    reqUser = User.objects(id=reqUser["userId"]).first()
 
     for dataKey in request.json:
-        if dataKey == 'email':
-            if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', request.json[dataKey]):
-                raise ResponseException("E-mail is not valid", 400)
-            if User.objects(email=request.json[dataKey]):
-                    raise ResponseException("An user with this e-mail already exists", 400)
-        elif dataKey == 'password' and len(request.json["password"]) <= 5:
-            raise ResponseException("Password too short", 400)
-        elif dataKey == 'status' and reqUser.role != 'admin':
+        if dataKey == 'email' and not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', request.json[dataKey]):
+            raise ResponseException("E-mail is not valid", 400)
+        if dataKey == 'email' and User.objects(email=request.json[dataKey]):
+                raise ResponseException("An user with this e-mail already exists", 400)
+        elif dataKey == 'password':
+            if len(request.json["password"]) <= 5:
+                raise ResponseException("Password too short", 400)
+            else:
+                salt =  bcrypt.gensalt(rounds=14)
+                hashedPassword =  bcrypt.hashpw(str.encode(request.json[dataKey]), salt)
+                hashedPassword = hashedPassword.decode()
+                setattr(user, dataKey, hashedPassword)
+        elif dataKey == 'status' and reqUser["role"] != 'admin':
             raise ResponseException("You are not allowed to change the status", 401)
-        elif dataKey == 'role' and reqUser.role != 'admin':
+        elif dataKey == 'status' and reqUser["role"] == 'admin':
+            setattr(user, dataKey, request.json[dataKey])
+            setattr(user, "activationToken", None)
+        elif dataKey == 'role' and reqUser["role"] != 'admin':
             raise ResponseException("You are not allowed to change the status", 401)
         elif dataKey == 'activationToken' or dataKey == 'mfaSecret':
             raise ResponseException("You are not allowed to change the status", 401)
         else:
             setattr(user, dataKey, request.json[dataKey])
-        
-        user.save()
-        logger.info(f"User {userId} updated by user {decodedJwt["userId"]}")
+    
+    user.save()
 
-        return {"msg": f"User {userId} updated", "status": "success"}, 200
+    logger.info(f"User {userId} updated by user {reqUser.id}")
+
+    return {"msg": f"User {userId} updated", "status": "success"}, 200
 
         
 @app.route("/account/<string:userId>", methods=["DELETE"])
-def deleteDeleteAccount(userId):
-    decodedJwt=isAuth(request)
-        
-    isOwnOrAdmin(decodedJwt["userId"], userId)
-
+@isOwnOrAdmin
+def deleteDeleteAccount(userId, reqUser):
     if not User.objects(id=userId):
         raise ResponseException("Invalid user id", 400)
 
     user = User.objects(id=userId).first()
         
     user.delete()
-    logger.info(f"User {userId} deleted by user {decodedJwt["userId"]}")
+    logger.info(f"User {userId} deleted by user {reqUser["userId"]}")
 
     return {"msg": f"User {userId} deleted", "status": "success"}, 200
 
@@ -254,7 +252,9 @@ def isValid():
         
     return {"msg": f"JWT is valid", "status": "success"}, 200
 
-@app.route("/uploadLogo", methods=["PUT"])
+
+@app.route("/uploadLogo", methods=["PUT", "OPTIONS"])
+@isAdmin
 def uploadLogo():
     decodedJwt = isAuth(request)
     isAdmin(decodedJwt["userId"])
@@ -285,7 +285,7 @@ if __name__ == "__main__":
         }
 
         for level, filename in log_levels.items():
-            handler = logging.FileHandler(filename)
+            handler = RotatingFileHandler(filename, maxBytes=200*1024*1024, backupCount=5)
             handler.setLevel(level)  # Set the handler to only handle this level
             formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
             handler.setFormatter(formatter)
