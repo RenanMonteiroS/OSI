@@ -194,6 +194,87 @@ def postLogin():
                      
         return {"msg": f"Login of user {str(user.id)} done", "status": "success", "JWT": f"{jwtToken}"}, 200 
 
+@app.route("/account/create", methods=["POST"])
+@isAdmin
+def postCreateAccount():
+    if not "name" in request.json or not "email" in request.json or not "password" in request.json:
+            raise ResponseException("'name'/'email'/'password' expected", 400)
+
+    name = request.json["name"]
+    email = request.json["email"]
+    password = request.json["password"]
+
+    if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+        raise ResponseException("E-mail is not valid", 400)
+    
+    if len(password) <= 5:
+        raise ResponseException("Password too short", 400)
+    if not re.match(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[\W_]).+$', password):
+        raise ResponseException("Password does not correspond to the  set of required characters (special, uppercase, lowercase and number)", 400)
+
+    if User.objects(email=email):
+        raise ResponseException(msg=f"User with e-mail: {email} already exists", statusCode=400)
+
+        
+    salt =  bcrypt.gensalt(rounds=14)
+    hashedPassword =  bcrypt.hashpw(str.encode(password), salt)
+    hashedPassword = hashedPassword.decode()
+            
+        
+    mfaSecret = ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(16))
+    totp = pyotp.TOTP(b32encode(str.encode(mfaSecret)))
+        
+    qrcodeFullPathName = f'./templates/static/images/qrcode-{uuid4()}.png'
+    img = qrcode.make(totp.provisioning_uri(name=email, issuer_name=f'{config['COMPANY_INFO']['COMPANY_NAME']} OSI'))
+    img.save(qrcodeFullPathName)
+        
+    createdUser = User(name=name, email=email, password=hashedPassword, activationToken=token_urlsafe(), mfaSecret=mfaSecret).save()
+    logger.info(f"User {createdUser.id} created.")
+
+    env = Environment(
+        loader=FileSystemLoader('./templates/'),
+        autoescape=select_autoescape(['html', 'xml'])
+    )
+
+    template = env.get_template('emailTemplate.html')
+    html = template.render(userName=createdUser.name, activationLink=f"http://{request.host}/activate?token={createdUser.activationToken}", 
+                            companyName=config['COMPANY_INFO']['COMPANY_NAME'], companyWebsite=config['COMPANY_INFO']['COMPANY_WEBSITE'])
+
+    message = MIMEMultipart("alternative")
+    message['Subject'] = "Conclua a ativação da sua conta da OSI"
+    part = MIMEText(html, 'html')
+    message.attach(part)
+        
+    fp = open('./templates/static/images/logo.png', 'rb')
+    image1 = MIMEImage(fp.read())
+    fp.close()
+    image1.add_header('Content-ID', '<logo>')
+    message.attach(image1)
+    fp = open(qrcodeFullPathName, 'rb')
+    image2 = MIMEImage(fp.read())
+    fp.close()
+    image2.add_header('Content-ID', '<qrCode>')
+    message.attach(image2)
+    fp = open('./templates/static/images/emailActivationIllustration.png', 'rb')
+    image3 = MIMEImage(fp.read())
+    fp.close()
+    image3.add_header('Content-ID', '<emailActivationIllustration>')
+    message.attach(image3)
+    server = smtplib.SMTP(config['SMTP']['SMTP_SERVER'], int(config['SMTP']['SMTP_PORT']))
+    server.ehlo()
+    server.starttls()
+    server.ehlo()
+    server.login(config['SMTP']['SMTP_USER'], config['SMTP']['SMTP_PASSWORD'])
+    server.sendmail(config['SMTP']['SMTP_EMAILSENDER'], createdUser.email, message.as_string())
+    server.quit()
+
+    logger.info(f"Activation e-mail sended.")
+
+    remove(qrcodeFullPathName)
+
+    return {"msg": f"User created: {createdUser.id}", "status": "success"}, 201
+
+
 @app.route("/account/<string:userId>", methods=["PATCH"])
 @isOwnOrAdmin
 def patchUpdateAccount(userId, reqUser):
