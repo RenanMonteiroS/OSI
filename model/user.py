@@ -18,7 +18,7 @@ class User(Document):
     def save(self, *args, **kwargs):
         if not self.created_at:
             self.created_at = datetime.now()
-        self.updated_at = datetime.now()
+        self.modified_at = datetime.now()
         return super(User, self).save(*args, **kwargs)
 
         

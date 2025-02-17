@@ -44,7 +44,7 @@ def isAuth(request):
         raise ResponseException(f"Error decoding JWT: {e}", 401)
 
     except Exception as e:
-        raise ResponseException(e, 500)
+        raise ResponseException(str(e), 500)
 
 
 def isOwnOrAdmin(func):

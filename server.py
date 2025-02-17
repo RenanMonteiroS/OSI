@@ -198,6 +198,9 @@ def patchUpdateAccount(userId, reqUser):
     user = User.objects(id=userId).first()
     reqUser = User.objects(id=reqUser["userId"]).first()
 
+    if not user:
+        raise ResponseException("This user does not exist.", 400)
+
     for dataKey in request.json:
         if dataKey == 'email' and not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', request.json[dataKey]):
             raise ResponseException("E-mail is not valid", 400)
@@ -222,7 +225,7 @@ def patchUpdateAccount(userId, reqUser):
             raise ResponseException("You are not allowed to change the status", 401)
         else:
             setattr(user, dataKey, request.json[dataKey])
-    
+
     user.save()
 
     logger.info(f"User {userId} updated by user {reqUser.id}")
