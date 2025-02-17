@@ -39,15 +39,12 @@ def isAuth(request):
             raise ResponseException("JWT expired. Please login again", 401)
         
         return decodedJwt
-    
-    except ResponseException as e:
-        return make_response(e.getErrorData(), e.statusCode)
-    
+        
     except DecodeError as e:
-        return make_response({"msg": e}, 500)
+        raise ResponseException(f"Error decoding JWT: {e}", 401)
 
     except Exception as e:
-        return make_response({"msg": e}, 500)
+        raise ResponseException(e, 500)
 
 
 def isOwnOrAdmin(func):
@@ -55,8 +52,6 @@ def isOwnOrAdmin(func):
     def wrapper(*args, **kwargs):
         try:
             decodedJwt = isAuth(request)
-            if isinstance(decodedJwt, Response):
-                return decodedJwt
             
             reqUserId = decodedJwt["userId"]
             reqUser = None
@@ -79,20 +74,23 @@ def isOwnOrAdmin(func):
 def isAdmin(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        decodedJwt = isAuth(request)
-        
-        if isinstance(decodedJwt, Response):
-                return decodedJwt
-        
-        reqUserId = decodedJwt["userId"]
-        reqUser = None
-
-        for user in User.objects(id=reqUserId):
-            reqUser = user
-
-        if reqUser.role != 'admin':
-            return make_response(jsonify({"msg": "You are not allowed to do this operation", "status": "Unauthorized"}, 401))
+        try:
+            decodedJwt = isAuth(request)
             
-        return func(*args, **kwargs)
+            reqUserId = decodedJwt["userId"]
+            reqUser = None
+
+            for user in User.objects(id=reqUserId):
+                reqUser = user
+
+            if reqUser.role != 'admin':
+                raise ResponseException("You are not allowed to do this operation", 401)
+                
+            return func(*args, **kwargs)
+        
+        except ResponseException as e:
+            return make_response(e.getErrorData(), e.statusCode)
+        except Exception as e:
+            return make_response({"msg": e}, 500)
 
     return wrapper
