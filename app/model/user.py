@@ -5,6 +5,7 @@ STATUS = ('active', 'inactive')
 ROLES = ('admin', 'common')
 
 class User(Document):
+    """ User model. This class attributes and methods are handled by mongoengine ORM."""
     name = StringField(required=True)
     email = StringField(required=True)
     password = StringField(required=True)

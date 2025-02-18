@@ -1,10 +1,9 @@
 from functools import wraps
-from model.responseException import ResponseException
-from model.user import User
-from flask import request, make_response, jsonify, Response
+from ..model.responseException import ResponseException
+from ..model.user import User
+from flask import request, make_response
 from jwt.exceptions import DecodeError
 import jwt, configparser, datetime
-import inspect
 
 config = configparser.ConfigParser()
 config.read('config.conf')
@@ -13,6 +12,7 @@ config.read('config.conf')
 JWT_ALGORITHM = config['JWT']['JWT_ALGORITHM'] or 'HS256'
 
 def isAuth(request):
+    """Checks if the user is authenticated. Expects a Request object and returns a decoded JWT."""
     try:
         authorizationJwt = request.headers.get('Authorization')
         if not authorizationJwt:
@@ -48,6 +48,7 @@ def isAuth(request):
 
 
 def isOwnOrAdmin(func):
+    """Decorator which checks if the user is an administrator or itself. Implements isAuth function"""
     @wraps(func)
     def wrapper(*args, **kwargs):
         try:
@@ -72,6 +73,7 @@ def isOwnOrAdmin(func):
     return wrapper
 
 def isAdmin(func):
+    """Decorator which checks if the user is an administrator. Implements isAuth function"""
     @wraps(func)
     def wrapper(*args, **kwargs):
         try:

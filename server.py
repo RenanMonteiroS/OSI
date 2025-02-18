@@ -4,8 +4,8 @@ from flask import Flask, request
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from model.user import User
-from model.responseException import ResponseException
+from app.model.user import User
+from app.model.responseException import ResponseException
 from mongoengine import connect
 from secrets import token_urlsafe
 from email.mime.text import MIMEText
@@ -15,7 +15,7 @@ from base64 import b32encode
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from uuid import uuid4
 from os import remove
-from util.checkPermissions import isAuth, isOwnOrAdmin, isAdmin
+from app.util.checkPermissions import isAuth, isOwnOrAdmin, isAdmin
 from flask_uploads import UploadSet, IMAGES, configure_uploads
 import bcrypt, smtplib, jwt, pyotp, random, string, qrcode, configparser, datetime, re, os
 
