@@ -1,0 +1,413 @@
+{% if setupDone == 1 %}
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Setup Complete</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    /* Custom styles for full-height centering */
+    html, body {
+      height: 100%;
+    }
+    .centered-content {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100%;
+    }
+    footer {
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      text-align: center;
+      padding: 10px 0;
+      background-color: #f8f9fa;
+      border-top: 1px solid #ddd;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Centered h1 -->
+  <div class="centered-content">
+    <h1 class="text-center">Setup was already done. Try to call some endpoint!</h1>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <a href="https://github.com/RenanMonteiroS/OSI" target="_blank">OSI - Github</a>
+  </footer>
+
+  <!-- Bootstrap JS and dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.min.js"></script>
+</body>
+</html>
+
+
+{% else %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Setup Page</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .tab-content {
+      padding: 20px;
+      border: 1px solid #ddd;
+      border-top: none;
+    }
+    .hidden {
+      display: none;
+    }
+    .navbar-nav {
+      flex-direction: row;
+    }
+    .nav-item {
+      margin-right: 10px;
+    }
+  </style>
+</head>
+<body>
+   
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="#">Setup Page</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav" id="myTab" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link navbar-dark bg-dark active border-0" id="database-tab" data-bs-toggle="tab" data-bs-target="#database" type="button" role="tab" aria-controls="database" aria-selected="true">Database</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link navbar-dark bg-dark border-0" id="jwt-tab" data-bs-toggle="tab" data-bs-target="#jwt" type="button" role="tab" aria-controls="jwt" aria-selected="false">JWT</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link navbar-dark bg-dark border-0" id="smtp-tab" data-bs-toggle="tab" data-bs-target="#smtp" type="button" role="tab" aria-controls="smtp" aria-selected="false">SMTP</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link navbar-dark bg-dark border-0" id="company-info-tab" data-bs-toggle="tab" data-bs-target="#company-info" type="button" role="tab" aria-controls="company-info" aria-selected="false">Company Info</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link navbar-dark bg-dark border-0" id="limiter-tab" data-bs-toggle="tab" data-bs-target="#limiter" type="button" role="tab" aria-controls="limiter" aria-selected="false">Limiter</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link navbar-dark bg-dark border-0" id="admin-tab" data-bs-toggle="tab" data-bs-target="#admin" type="button" role="tab" aria-controls="admin" aria-selected="false">Admin</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link navbar-dark bg-dark border-0" id="confirmation-tab" data-bs-toggle="tab" data-bs-target="#confirmation" type="button" role="tab" aria-controls="confirmation" aria-selected="false" onclick="updateConfirmation();">Confirmation</button>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mt-4">
+    <div class="tab-content" id="myTabContent">
+      <div class="tab-pane fade show active" id="database" role="tabpanel" aria-labelledby="database-tab">
+        <h3>Database Configuration</h3>
+        <form>
+          <div class="mb-3">
+            <label for="mongoDbUri" class="form-label">MongoDB URI</label>
+            <input type="text" class="form-control" id="mongoDbUri" placeholder="Enter MongoDB URI" required> 
+          </div>
+          <div class="mb-3">
+            <button type="button" class="btn btn-light" onclick="pingDb()">Ping</button>
+          </div>
+          <button type="button" class="btn btn-dark" onclick="nextTab('jwt')">Next</button>
+        </form>
+      </div>
+
+      <div class="tab-pane fade" id="jwt" role="tabpanel" aria-labelledby="jwt-tab">
+        <h3>JWT Configuration</h3>
+        <form>
+          <div class="mb-3">
+            <label for="jwtAlgorithm" class="form-label">Encryption Algorithm</label>
+            <select class="form-select" id="jwtAlgorithm" onchange="toggleJwtFields()">
+              <option value="RS256">RS256</option>
+              <option value="HS256">HS256</option>
+            </select>
+          </div>
+          <div class="mb-3 hidden" id="jwtSecretField">
+            <label for="jwtSecret" class="form-label">Secret</label>
+            <input type="text" class="form-control" id="jwtSecret" placeholder="Enter JWT Secret">
+          </div>
+          <div class="mb-3 hidden" id="jwtPublicKeyField">
+            <label for="jwtPublicKeyPath" class="form-label">Public Key Path</label>
+            <input type="text" class="form-control" id="jwtPublicKeyPath" placeholder="Enter Public Key Path">
+          </div>
+          <div class="mb-3 hidden" id="jwtPrivateKeyField">
+            <label for="jwtPrivateKeyPath" class="form-label">Private Key Path</label>
+            <input type="text" class="form-control" id="jwtPrivateKeyPath" placeholder="Enter Private Key Path">
+          </div>
+          <button type="button" class="btn btn-dark" onclick="nextTab('smtp')">Next</button>
+        </form>
+      </div>
+
+      <div class="tab-pane fade" id="smtp" role="tabpanel" aria-labelledby="smtp-tab">
+        <h3>SMTP Configuration</h3>
+        <form>
+          <div class="mb-3">
+            <label for="smtpServer" class="form-label">Server</label>
+            <input type="text" class="form-control" id="smtpServer" placeholder="Enter SMTP Server">
+          </div>
+          <div class="mb-3">
+            <label for="smtpPort" class="form-label">Port</label>
+            <input type="number" class="form-control" id="smtpPort" placeholder="Enter SMTP Port">
+          </div>
+          <div class="mb-3">
+            <label for="smtpUser" class="form-label">User</label>
+            <input type="text" class="form-control" id="smtpUser" placeholder="Enter SMTP User">
+          </div>
+          <div class="mb-3">
+            <label for="smtpPassword" class="form-label">Password</label>
+            <input type="password" class="form-control" id="smtpPassword" placeholder="Enter SMTP Password">
+          </div>
+          <div class="mb-3">
+            <label for="smtpEmailSender" class="form-label">Email Sender</label>
+            <input type="email" class="form-control" id="smtpEmailSender" placeholder="Enter Email Sender">
+          </div>
+          <button type="button" class="btn btn-dark" onclick="nextTab('company-info')">Next</button>
+        </form>
+      </div>
+
+      <div class="tab-pane fade" id="company-info" role="tabpanel" aria-labelledby="company-info-tab">
+        <h3>Company Information</h3>
+        <form>
+          <div class="mb-3">
+            <label for="companyName" class="form-label">Name</label>
+            <input type="text" class="form-control" id="companyName" placeholder="Enter Company Name">
+          </div>
+          <div class="mb-3">
+            <label for="companyWebsite" class="form-label">Website</label>
+            <input type="url" class="form-control" id="companyWebsite" placeholder="Enter Company Website">
+          </div>
+          <div class="mb-3">
+            <label for="companyLogo" class="form-label">Logo</label>
+            <input type="file" accept="image/*" class="form-control" id="companyLogo" placeholder="Enter Company Website">
+          </div>
+          <button type="button" class="btn btn-dark" onclick="nextTab('limiter')">Next</button>
+        </form>
+      </div>
+
+      <div class="tab-pane fade" id="limiter" role="tabpanel" aria-labelledby="limiter-tab">
+        <h3>Limiter Configuration</h3>
+        <form>
+          <div class="mb-3">
+            <label for="storageDbUri" class="form-label">Storage Database URI</label>
+            <input type="text" class="form-control" id="storageDbUri" placeholder="Enter Storage Database URI">
+          </div>
+          <div class="mb-3">
+            <label for="limiterStrategy" class="form-label">Strategy</label>
+            <select class="form-select" id="limiterStrategy">
+              <option value="moving-window">Moving Window</option>
+              <option value="fixed-window">Fixed Window</option>
+              <option value="fixed-window-elastic-expiry">Fixed Window Elastic Expiry</option>
+            </select>
+          </div>
+          <button type="button" class="btn btn-dark" onclick="nextTab('admin');">Next</button>
+        </form>
+      </div>
+
+      <div class="tab-pane fade" id="admin" role="tabpanel" aria-labelledby="admin-tab">
+        <h3>Admin Configuration</h3>
+        <form>
+          <div class="mb-3">
+            <label for="adminEmail" class="form-label">Admin e-mail</label>
+            <input type="text" class="form-control" id="adminEmail" placeholder="Enter Admin E-mail" required>
+          </div>
+          <div class="mb-3">
+            <label for="adminName" class="form-label">Admin name</label>
+            <input type="text" class="form-control" id="adminName" placeholder="Enter Admin Name" required>
+          </div>
+          <div class="mb-3">
+            <label for="adminPassword" class="form-label">Admin password</label>
+            <input type="password" class="form-control" id="adminPassword" placeholder="Enter Admin Password" required>
+          </div>
+          
+          <button type="button" class="btn btn-dark" onclick="nextTab('confirmation'); updateConfirmation()">Next</button>
+        </form>
+      </div>
+
+      <div class="tab-pane fade" id="confirmation" role="tabpanel" aria-labelledby="confirmation-tab">
+        <h3>Confirmation</h3>
+        <div class="card">
+          <div class="card-body">
+            <h5 class="card-title">Selected Configuration</h5>
+            <p><strong>MongoDB URI:</strong> <span id="confMongoDbUri"></span></p>
+            <p><strong>JWT Algorithm:</strong> <span id="confJwtAlgorithm"></span></p>
+            <p><strong>JWT Secret:</strong> <span id="confJwtSecret"></span></p>
+            <p><strong>JWT Public Key Path:</strong> <span id="confJwtPublicKeyPath"></span></p>
+            <p><strong>JWT Private Key Path:</strong> <span id="confJwtPrivateKeyPath"></span></p>
+            <p><strong>SMTP Server:</strong> <span id="confSmtpServer"></span></p>
+            <p><strong>SMTP Port:</strong> <span id="confSmtpPort"></span></p>
+            <p><strong>SMTP User:</strong> <span id="confSmtpUser"></span></p>
+            <p><strong>SMTP Password:</strong> <span id="confSmtpPassword"></span></p>
+            <p><strong>SMTP Email Sender:</strong> <span id="confSmtpEmailSender"></span></p>
+            <p><strong>Company Name:</strong> <span id="confCompanyName"></span></p>
+            <p><strong>Company Website:</strong> <span id="confCompanyWebsite"></span></p>
+            <p><strong>Storage Database URI:</strong> <span id="confStorageDbUri"></span></p>
+            <p><strong>Limiter Strategy:</strong> <span id="confLimiterStrategy"></span></p>
+            <p><strong>Admin e-mail:</strong> <span id="confAdminEmail"></span></p>
+            <p><strong>Admin name:</strong> <span id="confAdminName"></span></p>
+            <p><strong>Admin password:</strong> <span id="confAdminPassword"></span></p>
+          </div>
+        </div>
+        <button type="button" class="btn btn-dark mt-3" onclick="submitForm()">Submit</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.min.js"></script>
+  <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+  <script>
+    
+    function toggleJwtFields() {
+      const algorithm = document.getElementById('jwtAlgorithm').value;
+      const jwtSecretField = document.getElementById('jwtSecretField');
+      const jwtPublicKeyField = document.getElementById('jwtPublicKeyField');
+      const jwtPrivateKeyField = document.getElementById('jwtPrivateKeyField');
+
+      if (algorithm === 'HS256') {
+        jwtSecretField.classList.remove('hidden');
+        jwtPublicKeyField.classList.add('hidden');
+        jwtPrivateKeyField.classList.add('hidden');
+      } else if (algorithm === 'RS256') {
+        jwtSecretField.classList.add('hidden');
+        jwtPublicKeyField.classList.remove('hidden');
+        jwtPrivateKeyField.classList.remove('hidden');
+      }
+    }
+
+    function nextTab(nextTabId) {
+      const nextTabTrigger = document.querySelector(`[data-bs-target="#${nextTabId}"]`);
+      if (nextTabTrigger) {
+        const tab = bootstrap.Tab.getOrCreateInstance(nextTabTrigger);
+        tab.show();
+      }
+    }
+
+    function updateConfirmation() {
+      document.getElementById('confMongoDbUri').textContent = document.getElementById('mongoDbUri').value;
+      document.getElementById('confJwtAlgorithm').textContent = document.getElementById('jwtAlgorithm').value;
+      document.getElementById('confJwtSecret').textContent = document.getElementById('jwtSecret').value || 'N/A';
+      document.getElementById('confJwtPublicKeyPath').textContent = document.getElementById('jwtPublicKeyPath').value || 'N/A';
+      document.getElementById('confJwtPrivateKeyPath').textContent = document.getElementById('jwtPrivateKeyPath').value || 'N/A';
+      document.getElementById('confSmtpServer').textContent = document.getElementById('smtpServer').value;
+      document.getElementById('confSmtpPort').textContent = document.getElementById('smtpPort').value;
+      document.getElementById('confSmtpUser').textContent = document.getElementById('smtpUser').value;
+      document.getElementById('confSmtpPassword').textContent = "**************";
+      document.getElementById('confSmtpEmailSender').textContent = document.getElementById('smtpEmailSender').value;
+      document.getElementById('confCompanyName').textContent = document.getElementById('companyName').value;
+      document.getElementById('confCompanyWebsite').textContent = document.getElementById('companyWebsite').value;
+      document.getElementById('confStorageDbUri').textContent = document.getElementById('storageDbUri').value;
+      document.getElementById('confLimiterStrategy').textContent = document.getElementById('limiterStrategy').value;
+      document.getElementById('confLimiterStrategy').textContent = document.getElementById('limiterStrategy').value;
+      document.getElementById('confAdminEmail').textContent = document.getElementById('adminEmail').value;
+      document.getElementById('confAdminName').textContent = document.getElementById('adminName').value;
+      document.getElementById('confAdminPassword').textContent = "**************";
+    }
+
+    async function submitForm() {
+      const fileInput = document.getElementById('companyLogo');
+      const file = fileInput.files[0];
+
+      function readFileAsBase64(file) {
+          return new Promise((resolve, reject) => {
+              const reader = new FileReader();
+
+              reader.onload = () => {
+                  const base64String = reader.result.replace("data:", "").replace(/^.+,/, "");
+                  resolve(base64String);
+              };
+
+              reader.onerror = () => {
+                  reject(new Error("Failed to read file"));
+              };
+
+              reader.readAsDataURL(file);
+          });
+      }
+
+      try {
+          const base64String = await readFileAsBase64(file);
+
+          const response = await $.ajax({
+              type: "POST",
+              contentType: "application/json",
+              url: "/setup",
+              data: JSON.stringify({
+                  dbUri: document.getElementById('mongoDbUri').value,
+                  jwtAlgorithm: document.getElementById('jwtAlgorithm').value,
+                  jwtSecret: document.getElementById('jwtSecret').value || 'N/A',
+                  jwtPublicKeyPath: document.getElementById('jwtPublicKeyPath').value || 'N/A',
+                  jwtPrivateKeyPath: document.getElementById('jwtPrivateKeyPath').value || 'N/A',
+                  smtpServer: document.getElementById('smtpServer').value,
+                  smtpPort: document.getElementById('smtpPort').value,
+                  smtpUser: document.getElementById('smtpUser').value,
+                  smtpPassword: document.getElementById('smtpPassword').value,
+                  smtpEmailSender: document.getElementById('smtpEmailSender').value,
+                  companyName: document.getElementById('companyName').value,
+                  companyLogo: base64String,
+                  companyWebsite: document.getElementById('companyWebsite').value,
+                  limiterDbUri: document.getElementById('storageDbUri').value,
+                  limiterStrategy: document.getElementById('limiterStrategy').value,
+                  adminEmail: document.getElementById('adminEmail').value,
+                  adminName: document.getElementById('adminName').value,
+                  adminPassword: document.getElementById('adminPassword').value
+              }),
+              dataType: "json"
+          });
+
+          console.log("Setup done with success! The server will restart in 5 seconds");
+          alert("Setup done with success! The server will restart in 5 seconds");
+          setTimeout(() => location.reload(), 5000); // Reload the page after 5 seconds
+      } catch (e) {
+          console.error("Error:", e);
+          alert("Error: " + (e.responseJSON.msg));
+      }
+    };
+    
+    function pingDb(){
+      $.ajax({
+          type: "POST",
+          contentType: "application/json",
+          url: "/dbping",
+          data: JSON.stringify({
+            dbUri: document.getElementById('mongoDbUri').value
+          }),
+          dataType: "json",
+          statusCode: {
+            200: () => {
+              alert('Connected to database');
+            },
+            400: (req, status, e) => {
+              alert('Bad request - Error: ' + e);
+              console.log(e)
+            },
+            500: (req, status, e) => {
+              alert('Cannot connect to database: ' + e);
+              console.log(e);
+            }
+          }
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      toggleJwtFields();
+      document.getElementById('confirmation').addEventListener('show.bs.tab', updateConfirmation);
+    });
+  </script>
+</body>
+</html>
+
+{% endif %}
